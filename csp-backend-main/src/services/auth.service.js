@@ -1,0 +1,250 @@
+const pool = require('../config/db');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const { sendOtpEmail, sendLoginWarningEmail } = require('./email.service');
+
+const MAX_ATTEMPTS = 5;
+const LOCK_TIME_MINUTES = 15;
+const WARNING_THRESHOLD = 3;
+
+async function login(email, password, ip, userAgent) {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const result = await client.query(`
+      SELECT u.id, u.email, u.password_hash, u.role, u.is_active,
+             s.failed_login_attempts, s.account_locked_until
+      FROM users u
+      JOIN user_security s ON u.id = s.user_id
+      WHERE u.email = $1
+      FOR UPDATE
+    `, [email]);
+
+    if (result.rows.length === 0) {
+      await client.query('COMMIT');
+      return invalidCredentials();
+    }
+
+    const user = result.rows[0];
+
+    if (!user.is_active) {
+      await client.query('COMMIT');
+      return invalidCredentials();
+    }
+
+    if (user.account_locked_until && new Date(user.account_locked_until) > new Date()) {
+      await client.query('COMMIT');
+      return {
+        success: false,
+        message: 'Account temporarily locked',
+        errorCode: 'ACCOUNT_LOCKED'
+      };
+    }
+
+    const passwordMatch = await bcrypt.compare(password, user.password_hash);
+
+    if (!passwordMatch) {
+      const attempts = await handleFailedAttempt(client, user.id, user.failed_login_attempts);
+
+      if (attempts >= WARNING_THRESHOLD) {
+        try {
+          await sendLoginWarningEmail(user.email, attempts);
+        } catch (mailError) {
+          console.error('Warning email failed:', mailError.message);
+        }
+      }
+
+      await client.query('COMMIT');
+      return invalidCredentials();
+    }
+
+    const otp = crypto.randomInt(100000, 999999).toString();
+    const otpHash = await bcrypt.hash(otp, 10);
+    const otpExpiry = new Date(Date.now() + 5 * 60000);
+
+    await client.query(`
+      UPDATE user_security
+      SET otp_hash = $1,
+          otp_expires_at = $2,
+          failed_otp_attempts = 0
+      WHERE user_id = $3
+    `, [otpHash, otpExpiry, user.id]);
+
+    await logAudit(client, user.id, 'login_password_valid', 'success', ip, userAgent, {});
+    await client.query('COMMIT');
+
+    try {
+      await sendOtpEmail(user.email, otp);
+    } catch (mailError) {
+      console.error('OTP email failed:', mailError.message);
+      return {
+        success: false,
+        message: 'Unable to send OTP email',
+        errorCode: 'OTP_EMAIL_FAILED'
+      };
+    }
+
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('OTP (dev only):', otp);
+    }
+
+    return {
+      success: true,
+      message: 'OTP sent to your email',
+      requiresOtp: true,
+      userId: user.id
+    };
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function verifyOtp(userId, otp, ip, userAgent) {
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    const result = await client.query(`
+      SELECT s.otp_hash,
+             s.otp_expires_at,
+             s.failed_otp_attempts,
+             s.account_locked_until,
+             u.role
+      FROM user_security s
+      JOIN users u ON u.id = s.user_id
+      WHERE s.user_id = $1
+      FOR UPDATE
+    `, [userId]);
+
+    if (result.rows.length === 0) {
+      await client.query('COMMIT');
+      return invalidCredentials();
+    }
+
+    const record = result.rows[0];
+
+    if (record.account_locked_until && new Date(record.account_locked_until) > new Date()) {
+      await client.query('COMMIT');
+      return {
+        success: false,
+        message: 'Account temporarily locked',
+        errorCode: 'ACCOUNT_LOCKED'
+      };
+    }
+
+    if (!record.otp_hash || !record.otp_expires_at) {
+      await client.query('COMMIT');
+      return invalidCredentials();
+    }
+
+    if (new Date(record.otp_expires_at) < new Date()) {
+      await client.query('COMMIT');
+      return {
+        success: false,
+        message: 'OTP expired',
+        errorCode: 'OTP_EXPIRED'
+      };
+    }
+
+    const match = await bcrypt.compare(otp, record.otp_hash);
+
+    if (!match) {
+      const attempts = record.failed_otp_attempts + 1;
+      let lockUntil = null;
+
+      if (attempts >= MAX_ATTEMPTS) {
+        lockUntil = new Date(Date.now() + LOCK_TIME_MINUTES * 60000);
+      }
+
+      await client.query(`
+        UPDATE user_security
+        SET failed_otp_attempts = $1,
+            account_locked_until = $2
+        WHERE user_id = $3
+      `, [attempts, lockUntil, userId]);
+
+      await logAudit(client, userId, 'login_otp_failed', 'failure', ip, userAgent, {});
+      await client.query('COMMIT');
+
+      return invalidCredentials();
+    }
+
+    await client.query(`
+      UPDATE user_security
+      SET otp_hash = NULL,
+          otp_expires_at = NULL,
+          failed_otp_attempts = 0,
+          failed_login_attempts = 0,
+          account_locked_until = NULL,
+          last_login_at = NOW(),
+          last_login_ip = $1
+      WHERE user_id = $2
+    `, [ip, userId]);
+
+    await logAudit(client, userId, 'login_otp_verified', 'success', ip, userAgent, {});
+    await client.query('COMMIT');
+
+    const token = jwt.sign(
+      { sub: userId, role: record.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m', issuer: 'csp-control-plane' }
+    );
+
+    return {
+      success: true,
+      data: { token }
+    };
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+async function handleFailedAttempt(client, userId, currentAttempts) {
+  const attempts = currentAttempts + 1;
+  let lockUntil = null;
+
+  if (attempts >= MAX_ATTEMPTS) {
+    lockUntil = new Date(Date.now() + LOCK_TIME_MINUTES * 60000);
+  }
+
+  await client.query(`
+    UPDATE user_security
+    SET failed_login_attempts = $1,
+        account_locked_until = $2
+    WHERE user_id = $3
+  `, [attempts, lockUntil, userId]);
+
+  return attempts;
+}
+
+function invalidCredentials() {
+  return {
+    success: false,
+    message: 'Invalid credentials',
+    errorCode: 'AUTH_INVALID'
+  };
+}
+
+async function logAudit(client, userId, action, status, ip, userAgent, metadata) {
+  await client.query(`
+    INSERT INTO audit_logs (user_id, action, status, ip_address, user_agent, metadata)
+    VALUES ($1, $2, $3, $4, $5, $6)
+  `, [userId, action, status, ip, userAgent, metadata]);
+}
+
+module.exports = {
+  login,
+  verifyOtp
+};
