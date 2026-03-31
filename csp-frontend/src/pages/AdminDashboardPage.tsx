@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react';
-import { getAllQueries, replyToQuery, updateQueryStatus, type QueryItem } from '../api/queries';
+import {
+  getAllQueries,
+  getSecurityEvents,
+  replyToQuery,
+  updateQueryStatus,
+  type BlockedIp,
+  type FailedLoginAttempt,
+  type QueryItem,
+  type SecurityAuditLog
+} from '../api/queries';
 import { clearToken } from '../utils/auth';
 import { useNavigate } from 'react-router-dom';
 
@@ -22,6 +31,12 @@ export function AdminDashboardPage() {
   const [error, setError] = useState('');
   const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
 
+  const [securityLoading, setSecurityLoading] = useState(true);
+  const [securityError, setSecurityError] = useState('');
+  const [auditLogs, setAuditLogs] = useState<SecurityAuditLog[]>([]);
+  const [failedAttempts, setFailedAttempts] = useState<FailedLoginAttempt[]>([]);
+  const [blockedIps, setBlockedIps] = useState<BlockedIp[]>([]);
+
   async function loadAll() {
     setLoading(true);
     setError('');
@@ -40,15 +55,38 @@ export function AdminDashboardPage() {
     }
   }
 
+  async function loadSecurityEvents() {
+    setSecurityLoading(true);
+    setSecurityError('');
+
+    try {
+      const result = await getSecurityEvents();
+
+      if (!result.success) {
+        setSecurityError('Unable to load security events');
+        return;
+      }
+
+      setAuditLogs(result.data.recentAuditLogs);
+      setFailedAttempts(result.data.failedLoginAttempts);
+      setBlockedIps(result.data.blockedIps);
+    } catch (err: unknown) {
+      const apiError = err as ApiError;
+      setSecurityError(apiError.response?.data?.message || 'Unable to load security events');
+    } finally {
+      setSecurityLoading(false);
+    }
+  }
+
   useEffect(() => {
-    void loadAll();
+    void Promise.all([loadAll(), loadSecurityEvents()]);
   }, []);
 
   async function onStatusChange(id: string, status: StatusType) {
     setError('');
     try {
       await updateQueryStatus(id, status);
-      await loadAll();
+      await Promise.all([loadAll(), loadSecurityEvents()]);
     } catch (err: unknown) {
       const apiError = err as ApiError;
       setError(apiError.response?.data?.message || 'Unable to update status');
@@ -63,7 +101,7 @@ export function AdminDashboardPage() {
     try {
       await replyToQuery(id, reply);
       setReplyDrafts((prev) => ({ ...prev, [id]: '' }));
-      await loadAll();
+      await Promise.all([loadAll(), loadSecurityEvents()]);
     } catch (err: unknown) {
       const apiError = err as ApiError;
       setError(apiError.response?.data?.message || 'Unable to post reply');
@@ -82,18 +120,21 @@ export function AdminDashboardPage() {
   }
 
   return (
-    <div className="page-shell">
+    <div className="page-shell dashboard-shell">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
         <div>
           <h1 className="title" style={{ fontSize: 38 }}>Admin Dashboard</h1>
           <p className="subtitle">Review, prioritize, and resolve user queries.</p>
         </div>
-        <button className="btn btn-ghost" onClick={logout}>Logout</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost" onClick={() => navigate('/mfa/enable')}>Enable MFA</button>
+          <button className="btn btn-ghost" onClick={() => void logout()}>Logout</button>
+        </div>
       </div>
 
       {error ? <p className="error-text" style={{ marginBottom: 12 }}>{error}</p> : null}
 
-      <div className="card" style={{ padding: 18 }}>
+      <div className="card" style={{ padding: 18, marginBottom: 18 }}>
         <h2 className="title" style={{ fontSize: 22, marginBottom: 14 }}>All Queries</h2>
 
         {loading ? <p className="subtitle">Loading...</p> : null}
@@ -147,6 +188,70 @@ export function AdminDashboardPage() {
                 ) : null}
               </div>
             ))}
+          </div>
+        ) : null}
+      </div>
+
+      <div className="card" style={{ padding: 18 }}>
+        <h2 className="title" style={{ fontSize: 22, marginBottom: 14 }}>Security Events</h2>
+        {securityError ? <p className="error-text" style={{ marginBottom: 12 }}>{securityError}</p> : null}
+        {securityLoading ? <p className="subtitle">Loading security telemetry...</p> : null}
+
+        {!securityLoading ? (
+          <div style={{ display: 'grid', gap: 16 }}>
+            <div>
+              <h3 className="title" style={{ fontSize: 18, marginBottom: 8 }}>Active Blocked IPs</h3>
+              {blockedIps.length === 0 ? (
+                <p className="subtitle">No active IP blocks.</p>
+              ) : (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {blockedIps.slice(0, 8).map((entry) => (
+                    <div key={entry.id} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: 8 }}>
+                      <strong>{entry.ip}</strong>
+                      <p className="subtitle" style={{ fontSize: 13 }}>
+                        Until {new Date(entry.blocked_until).toLocaleString()} {entry.reason ? `• ${entry.reason}` : ''}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <h3 className="title" style={{ fontSize: 18, marginBottom: 8 }}>Failed Logins (24h)</h3>
+              {failedAttempts.length === 0 ? (
+                <p className="subtitle">No failed attempts recorded.</p>
+              ) : (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {failedAttempts.slice(0, 8).map((entry) => (
+                    <div key={`${entry.ip}-${entry.last_failed_at}`} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: 8 }}>
+                      <strong>{entry.ip}</strong>
+                      <p className="subtitle" style={{ fontSize: 13 }}>
+                        {entry.failed_count} failures • Last: {new Date(entry.last_failed_at).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <h3 className="title" style={{ fontSize: 18, marginBottom: 8 }}>Recent Audit Logs</h3>
+              {auditLogs.length === 0 ? (
+                <p className="subtitle">No audit events yet.</p>
+              ) : (
+                <div style={{ display: 'grid', gap: 8 }}>
+                  {auditLogs.slice(0, 10).map((entry) => (
+                    <div key={entry.id} style={{ border: '1px solid var(--line)', borderRadius: 8, padding: 8 }}>
+                      <strong>{entry.event_type}</strong>
+                      <p className="subtitle" style={{ fontSize: 13 }}>
+                        {entry.severity.toUpperCase()} • {entry.status} • {entry.ip || 'n/a'} • {new Date(entry.event_timestamp).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         ) : null}
       </div>

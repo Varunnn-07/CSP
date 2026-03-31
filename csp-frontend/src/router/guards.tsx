@@ -1,6 +1,6 @@
 import { Navigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
-import { getToken, getTokenRole } from '../utils/auth';
+import { clearToken, getToken, getTokenRole } from '../utils/auth';
 
 type Props = {
   children: ReactNode;
@@ -14,12 +14,14 @@ export function ProtectedRoute({ children, role }: Props) {
     return <Navigate to="/login" replace />;
   }
 
-  if (!role) {
-    return <>{children}</>;
+  const tokenRole = getTokenRole(token);
+
+  if (!tokenRole) {
+    clearToken();
+    return <Navigate to="/login" replace />;
   }
 
-  const tokenRole = getTokenRole(token);
-  if (tokenRole !== role) {
+  if (role && tokenRole !== role) {
     return <Navigate to="/login" replace />;
   }
 

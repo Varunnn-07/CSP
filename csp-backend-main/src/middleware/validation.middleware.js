@@ -1,17 +1,18 @@
-const Joi = require('joi');
+const AppError = require('../utils/appError');
 
-function validate(schema) {
+function validate(schema, source = 'body') {
   return (req, res, next) => {
-    const { error } = schema.validate(req.body);
+    const parsed = schema.safeParse(req[source]);
 
-    if (error) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid request",
-        errorCode: "VALIDATION_ERROR"
-      });
+    if (!parsed.success) {
+      return next(new AppError(
+        'Invalid request payload',
+        400,
+        'VALIDATION_ERROR'
+      ));
     }
 
+    req[source] = parsed.data;
     next();
   };
 }

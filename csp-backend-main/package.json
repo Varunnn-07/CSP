@@ -5,7 +5,14 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "seed:users": "node scripts/seedUsers.js",
+    "seed:test-auth-user": "node scripts/seedAuthSecurityTestUser.js",
+    "seed:screenshot-users": "node scripts/seedScreenshotUsers.js",
+    "reset:mfa": "node scripts/resetMfaForAllUsers.js",
+    "sync:dashboard": "node scripts/syncDashboardData.js",
+    "audit:deps": "npm audit",
+    "audit:fix": "npm audit fix"
   },
   "author": "Jayanth",
   "license": "UNLICENSED",
@@ -15,15 +22,20 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-rate-limit": "^8.2.1",
+    "express-validator": "^7.3.1",
     "helmet": "^7.1.0",
     "joi": "^18.0.2",
     "jsonwebtoken": "^9.0.3",
+    "node-cron": "^4.2.1",
     "nodemailer": "^8.0.1",
     "pg": "^8.11.5",
     "pino": "^9.0.0",
     "pino-http": "^9.0.0",
+    "qrcode": "^1.5.4",
     "sanitize-html": "^2.17.1",
-    "uuid": "^13.0.0"
+    "speakeasy": "^2.0.0",
+    "uuid": "^13.0.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

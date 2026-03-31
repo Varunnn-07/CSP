@@ -93,13 +93,16 @@ export function UserDashboardPage() {
   }
 
   return (
-    <div className="page-shell">
+    <div className="page-shell dashboard-shell">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
         <div>
           <h1 className="title" style={{ fontSize: 38 }}>User Dashboard</h1>
           <p className="subtitle">Raise and track your support queries.</p>
         </div>
-        <button className="btn btn-ghost" onClick={logout}>Logout</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-ghost" onClick={() => navigate('/mfa/enable')}>Enable MFA</button>
+          <button className="btn btn-ghost" onClick={() => void logout()}>Logout</button>
+        </div>
       </div>
 
       {error ? <p className="error-text" style={{ marginBottom: 12 }}>{error}</p> : null}

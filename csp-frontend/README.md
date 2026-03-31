@@ -11,27 +11,26 @@ React + TypeScript frontend for CSP backend.
 
 ## Prerequisites
 - Node.js 18+
-- CSP backend running on http://localhost:3000
+- CSP backend running on `http://localhost:3000`
 
 ## Setup
-1. npm install
-2. Create .env with:
-   VITE_API_BASE_URL=http://localhost:3000/api
-3. npm run dev
+1. `npm install`
+2. Create `.env` with:
+   `VITE_API_BASE_URL=http://localhost:3000/api`
+3. `npm run dev`
 
-App URL: http://localhost:5173
-
-## Login Credentials (Seeded)
-- Admin: admin1@example.com / TestPassword123!
-- User: user1@example.com / TestPassword123!
+App URL: `http://localhost:5173`
 
 ## Auth Flow
 1. Login with email/password
-2. OTP screen
-3. JWT stored in localStorage (key: csp_token)
-4. Role-based route access:
-   - /dashboard/admin
-   - /dashboard/user
+2. OTP verification
+3. Server returns:
+   - short-lived access token
+   - rotating refresh token
+4. Frontend auto-refreshes access tokens on 401 using refresh token rotation
+5. Role-based route access:
+   - `/dashboard/admin`
+   - `/dashboard/user`
 
 ## Main Features
 - Login + OTP verification
@@ -39,4 +38,9 @@ App URL: http://localhost:5173
 - Admin query list
 - Admin status update
 - Admin reply
+- Admin security event view
 - Route guards for role protection
+
+## Dependency Security Scanning
+- `npm run audit:deps`
+- `npm run audit:fix`

@@ -1,11 +1,13 @@
-const Joi = require('joi');
+const {
+  loginSchema,
+  otpSchema,
+  mfaSetupSchema,
+  mfaSetupVerifySchema
+} = require('../validators/auth.schemas');
 
-exports.loginSchema = Joi.object({
-  email: Joi.string().email().max(255).required(),
-  password: Joi.string().min(8).max(100).required()
-});
-
-exports.otpSchema = Joi.object({
-  userId: Joi.string().uuid().required(),
-  otp: Joi.string().length(6).pattern(/^[0-9]+$/).required()
-});
+module.exports = {
+  loginSchema,
+  otpSchema,
+  mfaSetupSchema,
+  mfaSetupVerifySchema
+};

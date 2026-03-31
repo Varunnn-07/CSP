@@ -1,44 +1,36 @@
 const express = require('express');
-const rateLimit = require('express-rate-limit');
+const { z } = require('zod');
 const validate = require('../middleware/validation.middleware');
-const { loginSchema, otpSchema } = require('../constants/validation.schemas');
+const { sanitizeFields } = require('../middleware/sanitize.middleware');
+const blockedIpMiddleware = require('../middleware/blocked-ip.middleware');
 const authController = require('../controllers/auth.controller');
+const { loginSchema, otpSchema, mfaSetupSchema } = require('../constants/validation.schemas');
+const {
+  loginLimiter,
+  otpLimiter,
+  strictLoginLimiter,
+  strictTotpLimiter
+} = require('../security/rateLimiters');
 
 const router = express.Router();
 
-/*
-  Login Rate Limiter
-  Protects against password brute-force
-*/
-const loginLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: "Too many login attempts",
-    errorCode: "RATE_LIMITED"
-  }
+const totpVerifySchema = z.object({
+  userId: z.string().uuid(),
+  token: z.string().regex(/^[0-9]{6}$/).optional(),
+  otp: z.string().regex(/^[0-9]{6}$/).optional(),
+  preAuthToken: z.string().min(20).optional()
+}).strict().refine((payload) => !!(payload.token || payload.otp), {
+  message: 'token or otp is required'
 });
 
-/*
-  OTP Rate Limiter
-  Protects against OTP brute-force
-*/
-const otpLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: {
-    success: false,
-    message: "Too many OTP attempts",
-    errorCode: "RATE_LIMITED"
-  }
-});
-
-router.post('/login', loginLimiter, validate(loginSchema), authController.login);
-router.post('/verify-otp', otpLimiter, validate(otpSchema), authController.verifyOtp);
+router.post('/login', blockedIpMiddleware, loginLimiter, strictLoginLimiter, validate(loginSchema), sanitizeFields(['email']), authController.login);
+router.post('/verify-otp', blockedIpMiddleware, otpLimiter, validate(otpSchema), authController.verifyOtp);
+router.post('/verify-totp', blockedIpMiddleware, otpLimiter, strictTotpLimiter, validate(totpVerifySchema), authController.verifyTotp);
+router.post('/mfa/setup', blockedIpMiddleware, loginLimiter, validate(mfaSetupSchema), authController.setupMfa);
+router.post('/mfa/verify-setup', blockedIpMiddleware, otpLimiter, validate(totpVerifySchema), authController.verifyMfaSetup);
+router.post('/mfa/verify', blockedIpMiddleware, otpLimiter, validate(totpVerifySchema), authController.verifyMfaSetup);
+router.post('/mfa/activate', blockedIpMiddleware, otpLimiter, validate(totpVerifySchema), authController.activateMfa);
+router.post('/refresh', blockedIpMiddleware, loginLimiter, authController.refresh);
+router.post('/logout', authController.logout);
 
 module.exports = router;

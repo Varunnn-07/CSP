@@ -1,38 +1,110 @@
-const nodemailer = require('nodemailer');
+const nodemailer = require("nodemailer");
 
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT || 587),
-  secure: String(process.env.SMTP_SECURE) === 'true',
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
+/* ------------------------------------------------ */
+/* CREATE MAIL TRANSPORT */
+/* ------------------------------------------------ */
+
+function createAlertTransport() {
+
+  const user = process.env.ALERT_EMAIL;
+  const pass = process.env.ALERT_EMAIL_PASSWORD;
+
+  if (!user || !pass) {
+    console.warn("Email alerts disabled: ALERT_EMAIL not configured.");
+    return null;
   }
-});
 
-const FROM = process.env.SMTP_FROM || process.env.SMTP_USER;
-
-async function sendOtpEmail(toEmail, otp) {
-  await transporter.sendMail({
-    from: FROM,
-    to: toEmail,
-    subject: 'Your CSP OTP Code',
-    text: `Your OTP is ${otp}. It will expire in 5 minutes.`,
-    html: `<p>Your OTP is <strong>${otp}</strong>.</p><p>It will expire in 5 minutes.</p>`
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: { user, pass },
+    tls: {
+      minVersion: "TLSv1.2",
+      rejectUnauthorized: true
+    }
   });
+
 }
 
-async function sendLoginWarningEmail(toEmail, attempts) {
+/* ------------------------------------------------ */
+/* ACCOUNT LOCK ALERT */
+/* ------------------------------------------------ */
+
+async function sendAccountLockedEmail(toEmail) {
+
+  const transporter = createAlertTransport();
+  if (!transporter) return;
+
   await transporter.sendMail({
-    from: FROM,
+    from: process.env.ALERT_EMAIL,
     to: toEmail,
-    subject: 'CSP Security Alert: Multiple Failed Login Attempts',
-    text: `We detected ${attempts} failed login attempts on your account. If this was not you, reset your password immediately.`,
-    html: `<p>We detected <strong>${attempts} failed login attempts</strong> on your account.</p><p>If this was not you, reset your password immediately.</p>`
+    subject: "Security Alert: Account Locked",
+    text:
+        "Your account has been locked due to multiple failed login attempts. Please contact support to unlock your account.",
+    html: `
+      <h3>Security Alert</h3>
+      <p>Your account has been locked due to multiple failed login attempts.</p>
+      <p>Please contact support to unlock your account.</p>
+    `
   });
+
 }
+
+/* ------------------------------------------------ */
+/* SUSPICIOUS LOGIN ALERT */
+/* ------------------------------------------------ */
+
+async function sendSuspiciousLoginEmail(toEmail, country, ip) {
+
+  const transporter = createAlertTransport();
+  if (!transporter) return;
+
+  await transporter.sendMail({
+    from: process.env.ALERT_EMAIL,
+    to: toEmail,
+    subject: "Security Alert: Suspicious Login Detected",
+    text:
+        `A login attempt was detected from ${country} (IP: ${ip}). If this was not you, please secure your account.`,
+    html: `
+      <h3>Suspicious Login Detected</h3>
+      <p>A login was detected from a new location:</p>
+      <ul>
+        <li><strong>Country:</strong> ${country}</li>
+        <li><strong>IP Address:</strong> ${ip}</li>
+      </ul>
+      <p>If this activity was not performed by you, please change your password immediately.</p>
+    `
+  });
+
+}
+
+/* ------------------------------------------------ */
+/* IP BLOCK ALERT (OPTIONAL SECURITY FEATURE) */
+/* ------------------------------------------------ */
+
+async function sendIpBlockedAlert(adminEmail, ip) {
+
+  const transporter = createAlertTransport();
+  if (!transporter) return;
+
+  await transporter.sendMail({
+    from: process.env.ALERT_EMAIL,
+    to: adminEmail,
+    subject: "Security Alert: IP Address Blocked",
+    text:
+        `The IP address ${ip} has been blocked due to repeated failed login attempts.`,
+    html: `
+      <h3>Security Alert</h3>
+      <p>The following IP address has been blocked due to suspicious activity:</p>
+      <p><strong>${ip}</strong></p>
+    `
+  });
+
+}
+
+/* ------------------------------------------------ */
 
 module.exports = {
-  sendOtpEmail,
-  sendLoginWarningEmail
+  sendAccountLockedEmail,
+  sendSuspiciousLoginEmail,
+  sendIpBlockedAlert
 };
