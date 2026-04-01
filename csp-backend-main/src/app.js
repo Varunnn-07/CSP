@@ -43,7 +43,7 @@ app.use(
                 defaultSrc: ["'self'"],
                 connectSrc: [
                     "'self'",
-                    process.env.FRONTEND_URL // 🔥 VERY IMPORTANT
+                    "https://csp-3ch7.onrender.com"
                 ],
                 imgSrc: ["'self'", 'data:'],
                 scriptSrc: ["'self'"],
