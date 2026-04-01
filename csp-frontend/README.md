@@ -11,12 +11,12 @@ React + TypeScript frontend for CSP backend.
 
 ## Prerequisites
 - Node.js 18+
-- CSP backend running on `http://localhost:3000`
+- CSP backend running and reachable via `VITE_API_URL`
 
 ## Setup
 1. `npm install`
 2. Create `.env` with:
-   `VITE_API_BASE_URL=http://localhost:3000/api`
+   `VITE_API_URL=https://your-backend-host`
 3. `npm run dev`
 
 App URL: `http://localhost:5173`

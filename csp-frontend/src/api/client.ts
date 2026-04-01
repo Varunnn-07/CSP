@@ -1,7 +1,7 @@
 import axios from 'axios';
+import { API } from '../config/api';
 import { clearToken, getToken } from '../utils/auth';
 
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 const CSRF_HEADER_NAME = 'x-csrf-token';
 const CSRF_STORAGE_KEY = 'csp_csrf_token';
 const AUTH_FAILURE_CODES = new Set(['AUTH_REQUIRED', 'INVALID_TOKEN']);
@@ -38,7 +38,7 @@ function clearCsrfToken() {
 }
 
 export const api = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json'

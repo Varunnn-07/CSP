@@ -28,7 +28,7 @@ type AccountProfileResponse = {
 } & AccountProfile;
 
 export async function getAccountProfile() {
-  const { data } = await api.get<AccountProfileResponse>('/account/profile');
+  const { data } = await api.get<AccountProfileResponse>('/api/account/profile');
 
   if (typeof data === 'object' && data !== null && 'data' in data && data.data) {
     return data.data;

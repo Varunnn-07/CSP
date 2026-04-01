@@ -12,7 +12,7 @@ const pool = new Pool({
   idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS || 30000),
   connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 2000),
 
-  // ✅ FIXED FOR NEON (CRITICAL)
+  // ✅ Required for Neon
   ssl: {
     rejectUnauthorized: false
   },
@@ -22,25 +22,25 @@ const pool = new Pool({
 });
 
 /* ------------------------------------------------ */
-/* CUSTOM QUERY WRAPPER (RLS SUPPORT) */
+/* SAVE ORIGINAL QUERY (CRITICAL FIX) */
 /* ------------------------------------------------ */
 
 const originalPoolQuery = pool.query.bind(pool);
 
 pool.query = async (...args) => {
   const requestClient = getRequestDbClient();
-  const client = requestClient || pool;
 
   try {
-    // ✅ GET USER ID FROM REQUEST CONTEXT
     const userId = requestClient?.userId || null;
 
-    // ✅ SET RLS CONTEXT (VERY IMPORTANT)
-    if (userId) {
-      await client.query(`SET app.user_id = '${userId}'`);
+    if (requestClient && userId) {
+      await requestClient.query(`SET app.user_id = '${userId}'`);
+      return await requestClient.query(...args);
     }
 
-    return await client.query(...args);
+    // ✅ Use ORIGINAL query (prevents recursion)
+    return await originalPoolQuery(...args);
+
   } catch (err) {
     console.error("Database query error:", err);
     throw err;
@@ -62,14 +62,13 @@ pool.on("error", (err) => {
 
 async function testConnection() {
   try {
-    await pool.query("SELECT 1");
+    await originalPoolQuery("SELECT 1"); // ✅ use original (avoid recursion)
     console.log("✅ Connected to Neon DB");
   } catch (err) {
     console.error("❌ Database connection failed:", err.message);
   }
 }
 
-// Run test on startup (optional but recommended)
 testConnection();
 
 /* ------------------------------------------------ */

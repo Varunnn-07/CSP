@@ -67,21 +67,21 @@ export type VerifyMfaSetupApiResponse = {
 };
 
 export async function login(payload: LoginPayload) {
-  const { data } = await api.post<LoginApiResponse>('/auth/login', payload);
+  const { data } = await api.post<LoginApiResponse>('/api/auth/login', payload);
   return data;
 }
 
 export async function verifyOtp(payload: VerifyOtpPayload) {
-  const { data } = await api.post<VerifyOtpApiResponse>('/auth/verify-otp', payload);
+  const { data } = await api.post<VerifyOtpApiResponse>('/api/auth/verify-otp', payload);
   return data;
 }
 
 export async function setupMfa(payload: { userId: string; preAuthToken?: string }) {
-  const { data } = await api.post<MfaSetupApiResponse>('/auth/mfa/setup', payload);
+  const { data } = await api.post<MfaSetupApiResponse>('/api/auth/mfa/setup', payload);
   return data;
 }
 
 export async function verifyMfaSetup(payload: VerifyMfaSetupPayload) {
-  const { data } = await api.post<VerifyMfaSetupApiResponse>('/auth/mfa/verify-setup', payload);
+  const { data } = await api.post<VerifyMfaSetupApiResponse>('/api/auth/mfa/verify-setup', payload);
   return data;
 }

@@ -27,11 +27,11 @@ export type CreateFeedbackPayload = {
 };
 
 export async function getMyFeedback() {
-  const { data } = await api.get<FeedbackListResponse>('/feedback');
+  const { data } = await api.get<FeedbackListResponse>('/api/feedback');
   return data;
 }
 
 export async function createFeedback(payload: CreateFeedbackPayload) {
-  const { data } = await api.post<FeedbackOneResponse>('/feedback', payload);
+  const { data } = await api.post<FeedbackOneResponse>('/api/feedback', payload);
   return data;
 }

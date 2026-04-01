@@ -49,7 +49,7 @@ export type DashboardFullData = {
 };
 
 export async function getDashboardFull() {
-  const { data } = await api.get<DashboardFullData>('/dashboard/full');
+  const { data } = await api.get<DashboardFullData>('/api/dashboard/full');
   return data;
 }
 

@@ -73,41 +73,41 @@ export type CreateQueryPayload = {
 };
 
 export async function getMyQueries() {
-  const { data } = await api.get<QueryListResponse>('/queries');
+  const { data } = await api.get<QueryListResponse>('/api/queries');
   return data;
 }
 
 export async function getAllQueries() {
-  const { data } = await api.get<QueryListResponse>('/queries/admin/all');
+  const { data } = await api.get<QueryListResponse>('/api/queries/admin/all');
   return data;
 }
 
 export async function createQuery(payload: CreateQueryPayload) {
-  const { data } = await api.post<QueryOneResponse>('/queries', payload);
+  const { data } = await api.post<QueryOneResponse>('/api/queries', payload);
   return data;
 }
 
 export async function getQueryById(id: string) {
-  const { data } = await api.get<QueryOneResponse>(`/queries/${id}`);
+  const { data } = await api.get<QueryOneResponse>(`/api/queries/${id}`);
   return data;
 }
 
 export async function replyToOwnQuery(id: string, message: string) {
-  const { data } = await api.post<QueryOneResponse>(`/queries/${id}/reply`, { message });
+  const { data } = await api.post<QueryOneResponse>(`/api/queries/${id}/reply`, { message });
   return data;
 }
 
 export async function updateQueryStatus(id: string, status: 'Open' | 'In Progress' | 'Resolved') {
-  const { data } = await api.patch<QueryOneResponse>(`/queries/admin/${id}/status`, { status });
+  const { data } = await api.patch<QueryOneResponse>(`/api/queries/admin/${id}/status`, { status });
   return data;
 }
 
 export async function replyToQuery(id: string, reply: string) {
-  const { data } = await api.post<QueryOneResponse>(`/queries/admin/${id}/reply`, { reply });
+  const { data } = await api.post<QueryOneResponse>(`/api/queries/admin/${id}/reply`, { reply });
   return data;
 }
 
 export async function getSecurityEvents() {
-  const { data } = await api.get<SecurityEventsResponse>('/admin/security/events');
+  const { data } = await api.get<SecurityEventsResponse>('/api/admin/security/events');
   return data;
 }
