@@ -43,7 +43,8 @@ app.use(
                 defaultSrc: ["'self'"],
                 connectSrc: [
                     "'self'",
-                    "https://csp-3ch7.onrender.com"
+                    "https://csp-3ch7.onrender.com",
+                    "https://csp-1-dmb5.onrender.com/"
                 ],
                 imgSrc: ["'self'", 'data:'],
                 scriptSrc: ["'self'"],
