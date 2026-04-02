@@ -26,13 +26,41 @@ function generateSecret() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-function buildCsrfCookieOptions() {
-  const isProduction = process.env.NODE_ENV === 'production';
+function shouldUseCrossSiteCookie(req) {
+  const origin = String(req.get('origin') || '').trim().toLowerCase();
+  const forwardedProto = String(req.get('x-forwarded-proto') || '')
+    .split(',')[0]
+    .trim()
+    .toLowerCase();
+  const configuredOrigins = String(process.env.FRONTEND_URL || '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+
+  const hasHostedFrontend = configuredOrigins.some((value) =>
+    value.startsWith('https://')
+    && !value.includes('localhost')
+    && !value.includes('127.0.0.1')
+  );
+
+  if (origin && configuredOrigins.includes(origin) && origin.startsWith('https://')) {
+    return true;
+  }
+
+  if (forwardedProto === 'https') {
+    return true;
+  }
+
+  return hasHostedFrontend;
+}
+
+function buildCsrfCookieOptions(req) {
+  const useCrossSiteCookie = shouldUseCrossSiteCookie(req);
 
   return {
     httpOnly: true,
-    secure: isProduction,
-    sameSite: isProduction ? 'none' : 'strict',
+    secure: useCrossSiteCookie,
+    sameSite: useCrossSiteCookie ? 'none' : 'strict',
     path: '/'
   };
 }
@@ -67,7 +95,7 @@ function csrfProtection(req, res, next) {
 
   if (!isSafeToken(secret)) {
     secret = generateSecret();
-    res.cookie(CSRF_COOKIE_NAME, secret, buildCsrfCookieOptions());
+    res.cookie(CSRF_COOKIE_NAME, secret, buildCsrfCookieOptions(req));
   }
 
   const csrfToken = createToken(secret);
