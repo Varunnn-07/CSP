@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { login } from '../api/authApi';
+import { getApiErrorPayload } from '../api/client';
 import { setToken } from '../utils/auth';
 
 const loginFormSchema = z.object({
@@ -12,14 +13,6 @@ const loginFormSchema = z.object({
 });
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
-
-type ApiError = {
-  response?: {
-    data?: {
-      message?: string;
-    };
-  };
-};
 
 function UserAvatarIcon() {
   return (
@@ -76,8 +69,7 @@ export function LoginPage() {
       const result = await login({ email: values.email.trim().toLowerCase(), password: values.password });
 
       if (!result.success) {
-        setError(result.message || 'Invalid credentials');
-        return;
+        throw new Error(result.message || 'Login failed');
       }
 
       const mfaSetupRequired = result.mfa_setup_required || result.mfaSetupRequired;
@@ -115,8 +107,7 @@ export function LoginPage() {
       setError('Unable to complete sign in');
     } catch (err: unknown) {
       console.error('Login request failed:', err);
-      const apiError = err as ApiError;
-      setError(apiError.response?.data?.message || 'Unable to connect to server');
+      setError(getApiErrorPayload(err).message || 'Login failed');
     } finally {
       setLoading(false);
     }

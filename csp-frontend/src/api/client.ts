@@ -37,6 +37,33 @@ function clearCsrfToken() {
   }
 }
 
+type ApiErrorPayload = {
+  message?: string;
+  remainingTime?: number;
+};
+
+export function getApiErrorPayload(error: unknown): ApiErrorPayload {
+  if (typeof error !== 'object' || error === null) {
+    return {};
+  }
+
+  const payload = (
+    error as {
+      response?: {
+        data?: ApiErrorPayload;
+      };
+      message?: string;
+    }
+  ).response?.data;
+
+  if (payload && typeof payload === 'object') {
+    return payload;
+  }
+
+  const message = (error as { message?: string }).message;
+  return typeof message === 'string' && message ? { message } : {};
+}
+
 export const api = axios.create({
   baseURL: API,
   withCredentials: true,

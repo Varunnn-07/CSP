@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { setupMfa, verifyMfaSetup } from '../api/authApi';
+import { getApiErrorPayload } from '../api/client';
 import { getToken, getTokenRole, getTokenUserId, setToken } from '../utils/auth';
 
 const formSchema = z.object({
@@ -11,15 +12,6 @@ const formSchema = z.object({
 });
 
 type FormValues = z.infer<typeof formSchema>;
-
-type ApiError = {
-  response?: {
-    data?: {
-      message?: string;
-      remainingTime?: number;
-    };
-  };
-};
 
 function formatOtpError(message?: string, remainingTime?: number) {
   if (typeof remainingTime === 'number' && remainingTime > 0) {
@@ -93,8 +85,7 @@ export function EnableMfa() {
       setManualCode(setupCode);
       setCurrentPreAuthToken(result.preAuthToken || preAuthToken || '');
     } catch (err: unknown) {
-      const apiError = err as ApiError;
-      setError(apiError.response?.data?.message || 'Unable to start MFA setup');
+      setError(getApiErrorPayload(err).message || 'Unable to start MFA setup');
     } finally {
       setLoading(false);
     }
@@ -172,8 +163,8 @@ export function EnableMfa() {
         navigate('/login', { replace: true });
       }, 800);
     } catch (err: unknown) {
-      const apiError = err as ApiError;
-      setError(formatOtpError(apiError.response?.data?.message, apiError.response?.data?.remainingTime));
+      const apiError = getApiErrorPayload(err);
+      setError(formatOtpError(apiError.message, apiError.remainingTime));
     } finally {
       setSubmitting(false);
     }

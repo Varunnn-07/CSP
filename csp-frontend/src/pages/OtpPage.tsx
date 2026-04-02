@@ -4,6 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { verifyOtp } from '../api/authApi';
+import { getApiErrorPayload } from '../api/client';
 import { setToken } from '../utils/auth';
 
 const otpSchema = z.object({
@@ -15,15 +16,6 @@ type OtpFormValues = z.infer<typeof otpSchema>;
 type OtpRouteState = {
   userId?: string;
   preAuthToken?: string;
-};
-
-type ApiError = {
-  response?: {
-    data?: {
-      message?: string;
-      remainingTime?: number;
-    };
-  };
 };
 
 function formatOtpError(message?: string, remainingTime?: number) {
@@ -91,8 +83,8 @@ export function OtpPage() {
       onAuthenticated(token);
     } catch (err: unknown) {
       console.error('OTP verification request failed:', err);
-      const apiError = err as ApiError;
-      setError(formatOtpError(apiError.response?.data?.message, apiError.response?.data?.remainingTime));
+      const apiError = getApiErrorPayload(err);
+      setError(formatOtpError(apiError.message, apiError.remainingTime));
     } finally {
       setLoading(false);
     }
