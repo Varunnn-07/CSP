@@ -3,6 +3,7 @@
   <component name="SqlDialectMappings">
     <file url="file://$PROJECT_DIR$/csp-backend-main/database/schema.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/csp-backend-main/database/seed.sql" dialect="PostgreSQL" />
+    <file url="file://$PROJECT_DIR$/csp-backend-main/database/test_auth_user_seed.sql" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/csp-backend-main/src/scripts/seedsUsers.js" dialect="GenericSQL" />
     <file url="file://$PROJECT_DIR$/csp-backend-main/src/security/ipBlock.service.js" dialect="PostgreSQL" />
     <file url="file://$PROJECT_DIR$/csp-backend-main/src/services/auth.service.js" dialect="GenericSQL" />

@@ -1,22 +1,24 @@
 const nodemailer = require("nodemailer");
 
+const EMAIL_USER = process.env.EMAIL_USER || process.env.ALERT_EMAIL;
+const EMAIL_PASS = process.env.EMAIL_PASS || process.env.ALERT_EMAIL_PASSWORD;
+
 /* ------------------------------------------------ */
 /* CREATE MAIL TRANSPORT */
 /* ------------------------------------------------ */
 
 function createAlertTransport() {
-
-  const user = process.env.ALERT_EMAIL;
-  const pass = process.env.ALERT_EMAIL_PASSWORD;
-
-  if (!user || !pass) {
-    console.warn("Email alerts disabled: ALERT_EMAIL not configured.");
+  if (!EMAIL_USER || !EMAIL_PASS) {
+    console.warn("Email alerts disabled: EMAIL_USER/EMAIL_PASS not configured.");
     return null;
   }
 
   return nodemailer.createTransport({
     service: "gmail",
-    auth: { user, pass },
+    auth: {
+      user: EMAIL_USER,
+      pass: EMAIL_PASS
+    },
     tls: {
       minVersion: "TLSv1.2",
       rejectUnauthorized: true
@@ -30,12 +32,11 @@ function createAlertTransport() {
 /* ------------------------------------------------ */
 
 async function sendAccountLockedEmail(toEmail) {
-
   const transporter = createAlertTransport();
   if (!transporter) return;
 
   await transporter.sendMail({
-    from: process.env.ALERT_EMAIL,
+    from: EMAIL_USER,
     to: toEmail,
     subject: "Security Alert: Account Locked",
     text:
@@ -49,6 +50,19 @@ async function sendAccountLockedEmail(toEmail) {
 
 }
 
+async function sendLockoutEmail(toEmail) {
+  const transporter = createAlertTransport();
+  if (!transporter) return;
+
+  await transporter.sendMail({
+    from: EMAIL_USER,
+    to: toEmail,
+    subject: "Account Locked - Security Alert",
+    text:
+      "Your account has been temporarily locked due to multiple failed login attempts. If this was not you, please reset your password or contact support."
+  });
+}
+
 /* ------------------------------------------------ */
 /* SUSPICIOUS LOGIN ALERT */
 /* ------------------------------------------------ */
@@ -59,7 +73,7 @@ async function sendSuspiciousLoginEmail(toEmail, country, ip) {
   if (!transporter) return;
 
   await transporter.sendMail({
-    from: process.env.ALERT_EMAIL,
+    from: EMAIL_USER,
     to: toEmail,
     subject: "Security Alert: Suspicious Login Detected",
     text:
@@ -87,7 +101,7 @@ async function sendIpBlockedAlert(adminEmail, ip) {
   if (!transporter) return;
 
   await transporter.sendMail({
-    from: process.env.ALERT_EMAIL,
+    from: EMAIL_USER,
     to: adminEmail,
     subject: "Security Alert: IP Address Blocked",
     text:
@@ -105,6 +119,7 @@ async function sendIpBlockedAlert(adminEmail, ip) {
 
 module.exports = {
   sendAccountLockedEmail,
+  sendLockoutEmail,
   sendSuspiciousLoginEmail,
   sendIpBlockedAlert
 };

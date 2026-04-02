@@ -26,6 +26,17 @@ function generateSecret() {
   return crypto.randomBytes(32).toString('hex');
 }
 
+function buildCsrfCookieOptions() {
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'strict',
+    path: '/'
+  };
+}
+
 function createToken(secret) {
   return crypto
     .createHmac('sha256', process.env.JWT_SECRET || 'csp-csrf')
@@ -56,12 +67,7 @@ function csrfProtection(req, res, next) {
 
   if (!isSafeToken(secret)) {
     secret = generateSecret();
-    res.cookie(CSRF_COOKIE_NAME, secret, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/'
-    });
+    res.cookie(CSRF_COOKIE_NAME, secret, buildCsrfCookieOptions());
   }
 
   const csrfToken = createToken(secret);
