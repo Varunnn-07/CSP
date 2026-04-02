@@ -27,6 +27,14 @@ async function createQuery(req, res, next) {
     const cleanSubject = sanitizeText(subject);
     const cleanMessage = sanitizeText(message);
 
+    if (!cleanServiceName || !cleanSubject || !cleanMessage) {
+      return res.status(400).json({
+        success: false,
+        message: 'Service name, subject, and message must contain visible text.',
+        errorCode: 'VALIDATION_ERROR'
+      });
+    }
+
     const priority = CATEGORY_PRIORITY[category];
 
     const result = await pool.query(
